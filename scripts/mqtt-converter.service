@@ -1,0 +1,20 @@
+[Unit]
+Description=MQTT SQL Converter Service
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/go_sql_converter
+ExecStart=/home/ubuntu/go_sql_converter/build/main
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Environment variables (if needed)
+Environment=PATH=/usr/local/go/bin:/usr/bin:/bin
+
+[Install]
+WantedBy=multi-user.target

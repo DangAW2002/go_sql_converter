@@ -1,0 +1,15 @@
+mqtt:
+  host: "localhost"
+  port: 1883
+  user: "weblog"
+  pass: "Stm32f103rd"
+  protocol: "tcp"
+  topic: "v1/DLOG4G/#"
+
+sql:
+  host: "localhost"
+  port: 3306
+  user: "weblog"
+  pass: "Weblog08052020"
+  dbname: "SOVIGAZ"
+  # sslmode: "disable"
