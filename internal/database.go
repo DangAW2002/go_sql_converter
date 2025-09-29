@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -66,15 +65,9 @@ func ProcessTelemetryMessage(db *sql.DB, msg mqtt.Message) {
 	payload := msg.Payload()
 	originalPayload := string(payload) // Keep original for logging
 
-	// Fix the JSON by adding quotes around keys
-	re := regexp.MustCompile(`(\w+):`)
-	fixedPayload := re.ReplaceAllStringFunc(string(payload), func(match string) string {
-		key := strings.TrimSuffix(match, ":")
-		return "\"" + key + "\":"
-	})
-	log.Printf("Fixed payload: %s", fixedPayload)
+	log.Printf("Payload: %s", originalPayload)
 	var data []map[string]interface{}
-	err := json.Unmarshal([]byte(fixedPayload), &data)
+	err := json.Unmarshal(payload, &data)
 	if err != nil {
 		log.Printf("Error parsing JSON: %v", err)
 		WriteHTMLLog(msg.Topic(), originalPayload, "unknown", 0, 0, 0, 0, time.Now().Format("2006-01-02 15:04:05"), "PARSE ERROR", "N/A", 0, 0, 0, 0, "")
