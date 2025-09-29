@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -65,9 +66,24 @@ func ProcessTelemetryMessage(db *sql.DB, msg mqtt.Message) {
 	payload := msg.Payload()
 	originalPayload := string(payload) // Keep original for logging
 
-	log.Printf("Payload: %s", originalPayload)
 	var data []map[string]interface{}
-	err := json.Unmarshal(payload, &data)
+	var err error
+
+	if strings.Contains(originalPayload, "Channel:") {
+		// Old format: fix JSON by adding quotes around keys
+		re := regexp.MustCompile(`(\w+):`)
+		fixedPayload := re.ReplaceAllStringFunc(string(payload), func(match string) string {
+			key := strings.TrimSuffix(match, ":")
+			return "\"" + key + "\":"
+		})
+		log.Printf("Fixed old format payload: %s", fixedPayload)
+		err = json.Unmarshal([]byte(fixedPayload), &data)
+	} else {
+		// New format: direct parse
+		log.Printf("Payload: %s", originalPayload)
+		err = json.Unmarshal(payload, &data)
+	}
+
 	if err != nil {
 		log.Printf("Error parsing JSON: %v", err)
 		WriteHTMLLog(msg.Topic(), originalPayload, "unknown", 0, 0, 0, 0, time.Now().Format("2006-01-02 15:04:05"), "PARSE ERROR", "N/A", 0, 0, 0, 0, "")
@@ -100,6 +116,9 @@ func ProcessTelemetryMessage(db *sql.DB, msg mqtt.Message) {
 			continue
 		}
 		chVal, hasCh := values["pressure1"]
+		if !hasCh {
+			chVal, hasCh = values["Channel"] // Backward compatibility for old format
+		}
 		l1Val, hasL1 := values["level1"]
 		p2Val, hasP2 := values["pressure2"]
 		l2Val, hasL2 := values["level2"]
