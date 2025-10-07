@@ -138,7 +138,7 @@ func ProcessTelemetryMessage(db *sql.DB, msg mqtt.Message) {
 
 			var insertResult, updateResult string
 
-			sqlQuery := fmt.Sprintf("INSERT INTO sensor_data (deviceID, status, sensor1, sensor2, sensor3, sensor4, sensor5, sensor6, sensor7, sensor8, SensorPowerStatus, GSMSignal, `Current_timestamp`, date_time, UnBox) VALUES ('%s', 'active', 0, 0, 0, 0, 0, 0, 0, 0, 'ON', 0, '%s', NOW(), '%s')", deviceID, dtStr, unBox)
+			sqlQuery := fmt.Sprintf("INSERT INTO sensor_data (deviceID, status, sensor1, sensor2, sensor3, sensor4, sensor5, sensor6, sensor7, sensor8, SensorPowerStatus, GSMSignal, `Current_timestamp`, date_time, UnBox) VALUES ('%s', 'active', 0, 0, 0, 0, 0, 0, 0, 0, 'ON', 0, NOW(), '%s', '%s')", deviceID, dtStr, unBox)
 			log.Printf("Executing SQL: %s", sqlQuery)
 			_, err := db.Exec(sqlQuery)
 			if err != nil {
@@ -206,7 +206,7 @@ func ProcessTelemetryMessage(db *sql.DB, msg mqtt.Message) {
 
 		var insertResult, updateResult string
 
-		sqlQuery := fmt.Sprintf("INSERT INTO sensor_data (deviceID, status, sensor1, sensor2, sensor3, sensor4, sensor5, sensor6, sensor7, sensor8, SensorPowerStatus, GSMSignal, `Current_timestamp`, date_time, UnBox) VALUES ('%s', 'active', %f, %f, %f, %f, 0, 0, 0, 0, 'ON', 0, '%s', NOW(), '%s')", deviceID, sensor1, sensor2, sensor3, sensor4, dtStr, unBox)
+		sqlQuery := fmt.Sprintf("INSERT INTO sensor_data (deviceID, status, sensor1, sensor2, sensor3, sensor4, sensor5, sensor6, sensor7, sensor8, SensorPowerStatus, GSMSignal, `Current_timestamp`, date_time, UnBox) VALUES ('%s', 'active', %f, %f, %f, %f, 0, 0, 0, 0, 'ON', 0, NOW(), '%s', '%s')", deviceID, sensor1, sensor2, sensor3, sensor4, dtStr, unBox)
 		log.Printf("Executing SQL: %s", sqlQuery)
 		_, err := db.Exec(sqlQuery)
 		if err != nil {
