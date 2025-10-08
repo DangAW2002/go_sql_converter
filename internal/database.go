@@ -66,6 +66,15 @@ func ProcessTelemetryMessage(db *sql.DB, msg mqtt.Message) {
 	payload := msg.Payload()
 	originalPayload := string(payload) // Keep original for logging
 
+	// Extract deviceID from topic first
+	parts := strings.Split(msg.Topic(), "/")
+	if len(parts) < 3 {
+		log.Printf("Invalid topic format: %s", msg.Topic())
+		WriteHTMLLog(msg.Topic(), originalPayload, "unknown", 0, 0, 0, 0, time.Now().Format("2006-01-02 15:04:05"), "INVALID TOPIC", "N/A", 0, 0, 0, 0, "")
+		return
+	}
+	deviceID := parts[2]
+
 	var data []map[string]interface{}
 	var err error
 
@@ -86,17 +95,9 @@ func ProcessTelemetryMessage(db *sql.DB, msg mqtt.Message) {
 
 	if err != nil {
 		log.Printf("Error parsing JSON: %v", err)
-		WriteHTMLLog(msg.Topic(), originalPayload, "unknown", 0, 0, 0, 0, time.Now().Format("2006-01-02 15:04:05"), "PARSE ERROR", "N/A", 0, 0, 0, 0, "")
+		WriteHTMLLog(msg.Topic(), originalPayload, deviceID, 0, 0, 0, 0, time.Now().Format("2006-01-02 15:04:05"), "PARSE ERROR", "N/A", 0, 0, 0, 0, "")
 		return
 	}
-
-	parts := strings.Split(msg.Topic(), "/")
-	if len(parts) < 3 {
-		log.Printf("Invalid topic format: %s", msg.Topic())
-		WriteHTMLLog(msg.Topic(), originalPayload, "unknown", 0, 0, 0, 0, time.Now().Format("2006-01-02 15:04:05"), "INVALID TOPIC", "N/A", 0, 0, 0, 0, "")
-		return
-	}
-	deviceID := parts[2]
 
 	for _, item := range data {
 		tsVal, ok := item["ts"]
@@ -243,14 +244,7 @@ func ProcessAttributesMessage(db *sql.DB, msg mqtt.Message) {
 	payload := msg.Payload()
 	log.Printf("Processing attributes message: %s", string(payload))
 
-	var attributes map[string]interface{}
-	err := json.Unmarshal(payload, &attributes)
-	if err != nil {
-		log.Printf("Error parsing attributes JSON: %v", err)
-		WriteHTMLLog(msg.Topic(), string(payload), "unknown", 0, 0, 0, 0, time.Now().Format("2006-01-02 15:04:05"), "N/A", "PARSE ERROR", 0, 0, 0, 0, "")
-		return
-	}
-
+	// Extract deviceID from topic first
 	parts := strings.Split(msg.Topic(), "/")
 	if len(parts) < 3 {
 		log.Printf("Invalid topic format for attributes: %s", msg.Topic())
@@ -258,6 +252,14 @@ func ProcessAttributesMessage(db *sql.DB, msg mqtt.Message) {
 		return
 	}
 	deviceID := parts[2]
+
+	var attributes map[string]interface{}
+	err := json.Unmarshal(payload, &attributes)
+	if err != nil {
+		log.Printf("Error parsing attributes JSON: %v", err)
+		WriteHTMLLog(msg.Topic(), string(payload), deviceID, 0, 0, 0, 0, time.Now().Format("2006-01-02 15:04:05"), "N/A", "PARSE ERROR", 0, 0, 0, 0, "")
+		return
+	}
 
 	// Initialize attribute values
 	var mainPower float64
