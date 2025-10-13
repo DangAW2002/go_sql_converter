@@ -9,7 +9,9 @@ import (
 	"time"
 )
 
-func WriteHTMLLog(topic, originalPayload, deviceID string, sensor1, sensor2, sensor3, sensor4 float64, timestamp, insertResult, updateResult string, mainPower float64, gsmSignal int, sampleTime int, sendingRate int, unBox string) {
+func WriteHTMLLog(topic, originalPayload, deviceID string, sensor1, sensor2, sensor3, sensor4 float64, timestamp, insertResult, updateResult, alertResult string, mainPower float64, gsmSignal int, sampleTime int, sendingRate int, unBox string) {
+	// Wrap raw data if longer than 100 chars
+	wrappedPayload := wrapText(originalPayload, 100)
 	// Create log directory
 	logDir := "/opt/lampp/htdocs/DAQ/LOG"
 	if err := os.MkdirAll(logDir, 0755); err != nil {
@@ -98,6 +100,10 @@ UnBox: %s`,
 		formatNumber(sensor1), formatNumber(sensor2),
 		formatNumber(sensor3), formatNumber(sensor4), unBox)
 
+	if alertResult != "N/A" {
+		processedData += fmt.Sprintf(`<br>Alert: %s`, alertResult)
+	}
+
 	if strings.Contains(topic, "attributes") {
 		// For attributes, show the attributes data
 		processedData = fmt.Sprintf(`Timestamp: %s<br>
@@ -110,20 +116,30 @@ SendingRate: %d<br>
 UnBox: %s`,
 			timestamp, deviceID,
 			formatNumber(mainPower), gsmSignal, sampleTime, sendingRate, unBox)
+		if alertResult != "N/A" {
+			processedData += fmt.Sprintf(`<br>Alert: %s`, alertResult)
+		}
 	}
 
 	// Determine CSS class based on operation results
 	insertClass := "success"
 	updateClass := "success"
+	alertClass := "success"
 	if strings.Contains(insertResult, "FAILED") {
 		insertClass = "error"
 	}
 	if strings.Contains(updateResult, "FAILED") {
 		updateClass = "error"
 	}
+	if strings.Contains(alertResult, "FAILED") {
+		alertClass = "error"
+	}
 
 	databaseOps := fmt.Sprintf(`<span class="%s">%s</span><br><span class="%s">%s</span>`,
 		insertClass, insertResult, updateClass, updateResult)
+	if alertResult != "N/A" {
+		databaseOps += fmt.Sprintf(`<br><span class="%s">%s</span>`, alertClass, alertResult)
+	}
 
 	row := fmt.Sprintf(`        <tr>
             <td class="timestamp">%s</td>
@@ -133,8 +149,26 @@ UnBox: %s`,
             <td class="processed-data">%s</td>
             <td class="db-ops">%s</td>
         </tr>
-`, currentTime, deviceID, topic, originalPayload, processedData, databaseOps)
+`, currentTime, deviceID, topic, wrappedPayload, processedData, databaseOps)
 
 	file.WriteString(row)
 	log.Printf("Written HTML log for device %s", deviceID)
+}
+
+func wrapText(text string, maxLen int) string {
+	if len(text) <= maxLen {
+		return text
+	}
+	var result strings.Builder
+	for i := 0; i < len(text); i += maxLen {
+		end := i + maxLen
+		if end > len(text) {
+			end = len(text)
+		}
+		result.WriteString(text[i:end])
+		if end < len(text) {
+			result.WriteString("<br>")
+		}
+	}
+	return result.String()
 }

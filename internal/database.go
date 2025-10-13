@@ -70,7 +70,7 @@ func ProcessTelemetryMessage(db *sql.DB, msg mqtt.Message) {
 	parts := strings.Split(msg.Topic(), "/")
 	if len(parts) < 3 {
 		log.Printf("Invalid topic format: %s", msg.Topic())
-		WriteHTMLLog(msg.Topic(), originalPayload, "unknown", 0, 0, 0, 0, time.Now().Format("2006-01-02 15:04:05"), "INVALID TOPIC", "N/A", 0, 0, 0, 0, "")
+		WriteHTMLLog(msg.Topic(), originalPayload, "unknown", 0, 0, 0, 0, time.Now().Format("2006-01-02 15:04:05"), "INVALID TOPIC", "N/A", "N/A", 0, 0, 0, 0, "")
 		return
 	}
 	deviceID := parts[2]
@@ -95,7 +95,7 @@ func ProcessTelemetryMessage(db *sql.DB, msg mqtt.Message) {
 
 	if err != nil {
 		log.Printf("Error parsing JSON: %v", err)
-		WriteHTMLLog(msg.Topic(), originalPayload, deviceID, 0, 0, 0, 0, time.Now().Format("2006-01-02 15:04:05"), "PARSE ERROR", "N/A", 0, 0, 0, 0, "")
+		WriteHTMLLog(msg.Topic(), originalPayload, deviceID, 0, 0, 0, 0, time.Now().Format("2006-01-02 15:04:05"), "PARSE ERROR", "N/A", "N/A", 0, 0, 0, 0, "")
 		return
 	}
 
@@ -137,18 +137,7 @@ func ProcessTelemetryMessage(db *sql.DB, msg mqtt.Message) {
 			dtStr := dt.Format("2006-01-02 15:04:05")
 			log.Printf("Parsed UnBox: %s, timestamp=%s, deviceID=%s", unBox, dtStr, deviceID)
 
-			var insertResult, updateResult string
-
-			sqlQuery := fmt.Sprintf("INSERT INTO sensor_data (deviceID, status, sensor1, sensor2, sensor3, sensor4, sensor5, sensor6, sensor7, sensor8, SensorPowerStatus, GSMSignal, `Current_timestamp`, date_time, UnBox) VALUES ('%s', 'active', 0, 0, 0, 0, 0, 0, 0, 0, 'ON', 0, NOW(), '%s', '%s')", deviceID, dtStr, unBox)
-			log.Printf("Executing SQL: %s", sqlQuery)
-			_, err := db.Exec(sqlQuery)
-			if err != nil {
-				log.Printf("Error executing SQL for sensor_data: %v", err)
-				insertResult = "INSERT sensor_data: FAILED - " + err.Error()
-			} else {
-				log.Printf("Inserted sensor data for device %s at %s", deviceID, dtStr)
-				insertResult = "INSERT sensor_data: SUCCESS"
-			}
+			var updateResult string
 
 			// Update rdas_dev table
 			updateQuery := fmt.Sprintf("UPDATE rdas_dev SET status = NOW(), LatestData = '%s', Type = 'MQTT', UnBox = '%s' WHERE devID = '%s'", dtStr, unBox, deviceID)
@@ -162,8 +151,25 @@ func ProcessTelemetryMessage(db *sql.DB, msg mqtt.Message) {
 				updateResult = "UPDATE rdas_dev: SUCCESS"
 			}
 
+			// If UnBox is "O", insert into alert table
+			alertResult := "N/A"
+			if unBox == "O" {
+				alertTimeStr := dt.Format("15:04:05 02_01_2006")
+				description := fmt.Sprintf("Device>Urgent:CANH BAO MO TU LUC %s!!!!", alertTimeStr)
+				alertQuery := fmt.Sprintf("INSERT INTO alert (EventTime, InsertTime, Source, Priority, Description, AlertType, Project, Type, Status, Note) VALUES ('%s', NOW(), '%s', 1, '%s', 'Device', 'SOVIGAZ', 'Alert', 'V', '')", dtStr, deviceID, description)
+				log.Printf("Executing ALERT SQL: %s", alertQuery)
+				_, err = db.Exec(alertQuery)
+				if err != nil {
+					log.Printf("Error executing INSERT for alert: %v", err)
+					alertResult = "INSERT alert: FAILED - " + err.Error()
+				} else {
+					log.Printf("Inserted alert for device %s", deviceID)
+					alertResult = "INSERT alert: SUCCESS"
+				}
+			}
+
 			// Log to HTML file
-			WriteHTMLLog(msg.Topic(), originalPayload, deviceID, 0, 0, 0, 0, dtStr, insertResult, updateResult, 0, 0, 0, 0, unBox)
+			WriteHTMLLog(msg.Topic(), originalPayload, deviceID, 0, 0, 0, 0, dtStr, "N/A", updateResult, alertResult, 0, 0, 0, 0, unBox)
 			continue // Skip to next item
 		}
 
@@ -203,9 +209,25 @@ func ProcessTelemetryMessage(db *sql.DB, msg mqtt.Message) {
 
 		dt := time.Unix(int64(ts)/1000, (int64(ts)%1000)*int64(time.Millisecond))
 		dtStr := dt.Format("2006-01-02 15:04:05")
+
+		// If UnBox is "O", insert into alert table
+		if unBox == "O" {
+			alertTimeStr := dt.Format("15:04:05 02_01_2006")
+			description := fmt.Sprintf("Device>Urgent:CANH BAO MO TU LUC %s!!!!", alertTimeStr)
+			alertQuery := fmt.Sprintf("INSERT INTO alert (EventTime, InsertTime, Source, Priority, Description, AlertType, Project, Type, Status, Note) VALUES ('%s', NOW(), '%s', 1, '%s', 'Device', 'SOVIGAZ', 'Alert', 'V', '')", dtStr, deviceID, description)
+			log.Printf("Executing ALERT SQL: %s", alertQuery)
+			_, err = db.Exec(alertQuery)
+			if err != nil {
+				log.Printf("Error executing INSERT for alert: %v", err)
+			} else {
+				log.Printf("Inserted alert for device %s", deviceID)
+			}
+		}
+
 		log.Printf("Parsed values: sensor1=%.2f, sensor2=%.2f, sensor3=%.2f, sensor4=%.2f, timestamp=%s, deviceID=%s", sensor1, sensor2, sensor3, sensor4, dtStr, deviceID)
 
 		var insertResult, updateResult string
+		alertResult := "N/A"
 
 		sqlQuery := fmt.Sprintf("INSERT INTO sensor_data (deviceID, status, sensor1, sensor2, sensor3, sensor4, sensor5, sensor6, sensor7, sensor8, SensorPowerStatus, GSMSignal, `Current_timestamp`, date_time, UnBox) VALUES ('%s', 'active', %f, %f, %f, %f, 0, 0, 0, 0, 'ON', 0, NOW(), '%s', '%s')", deviceID, sensor1, sensor2, sensor3, sensor4, dtStr, unBox)
 		log.Printf("Executing SQL: %s", sqlQuery)
@@ -236,7 +258,7 @@ func ProcessTelemetryMessage(db *sql.DB, msg mqtt.Message) {
 		}
 
 		// Log to HTML file
-		WriteHTMLLog(msg.Topic(), originalPayload, deviceID, sensor1, sensor2, sensor3, sensor4, dtStr, insertResult, updateResult, 0, 0, 0, 0, unBox)
+		WriteHTMLLog(msg.Topic(), originalPayload, deviceID, sensor1, sensor2, sensor3, sensor4, dtStr, insertResult, updateResult, alertResult, 0, 0, 0, 0, unBox)
 	}
 }
 
@@ -248,7 +270,7 @@ func ProcessAttributesMessage(db *sql.DB, msg mqtt.Message) {
 	parts := strings.Split(msg.Topic(), "/")
 	if len(parts) < 3 {
 		log.Printf("Invalid topic format for attributes: %s", msg.Topic())
-		WriteHTMLLog(msg.Topic(), string(payload), "unknown", 0, 0, 0, 0, time.Now().Format("2006-01-02 15:04:05"), "N/A", "INVALID TOPIC", 0, 0, 0, 0, "")
+		WriteHTMLLog(msg.Topic(), string(payload), "unknown", 0, 0, 0, 0, time.Now().Format("2006-01-02 15:04:05"), "N/A", "INVALID TOPIC", "N/A", 0, 0, 0, 0, "")
 		return
 	}
 	deviceID := parts[2]
@@ -257,7 +279,7 @@ func ProcessAttributesMessage(db *sql.DB, msg mqtt.Message) {
 	err := json.Unmarshal(payload, &attributes)
 	if err != nil {
 		log.Printf("Error parsing attributes JSON: %v", err)
-		WriteHTMLLog(msg.Topic(), string(payload), deviceID, 0, 0, 0, 0, time.Now().Format("2006-01-02 15:04:05"), "N/A", "PARSE ERROR", 0, 0, 0, 0, "")
+		WriteHTMLLog(msg.Topic(), string(payload), deviceID, 0, 0, 0, 0, time.Now().Format("2006-01-02 15:04:05"), "N/A", "PARSE ERROR", "N/A", 0, 0, 0, 0, "")
 		return
 	}
 
@@ -302,7 +324,7 @@ func ProcessAttributesMessage(db *sql.DB, msg mqtt.Message) {
 
 	if len(updates) == 0 {
 		log.Printf("No valid attributes to update for device %s", deviceID)
-		WriteHTMLLog(msg.Topic(), string(payload), deviceID, 0, 0, 0, 0, time.Now().Format("2006-01-02 15:04:05"), "N/A", "NO VALID ATTRIBUTES", 0, 0, 0, 0, "")
+		WriteHTMLLog(msg.Topic(), string(payload), deviceID, 0, 0, 0, 0, time.Now().Format("2006-01-02 15:04:05"), "N/A", "NO VALID ATTRIBUTES", "N/A", 0, 0, 0, 0, "")
 		return
 	}
 
@@ -321,5 +343,5 @@ func ProcessAttributesMessage(db *sql.DB, msg mqtt.Message) {
 	}
 
 	// Log to HTML file
-	WriteHTMLLog(msg.Topic(), string(payload), deviceID, 0, 0, 0, 0, time.Now().Format("2006-01-02 15:04:05"), "N/A", updateResult, mainPower, gsmSignal, sampleTime, sendingRate, unBox)
+	WriteHTMLLog(msg.Topic(), string(payload), deviceID, 0, 0, 0, 0, time.Now().Format("2006-01-02 15:04:05"), "N/A", updateResult, "N/A", mainPower, gsmSignal, sampleTime, sendingRate, unBox)
 }
