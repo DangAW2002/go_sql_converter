@@ -86,7 +86,17 @@ func WriteHTMLLog(topic, originalPayload, deviceID string, sensor1, sensor2, sen
 		return fmt.Sprintf("%.3f", val)
 	}
 
-	processedData := fmt.Sprintf(`Timestamp: %s<br>
+	processedData := ""
+	if sensor1 == 0 && sensor2 == 0 && sensor3 == 0 && sensor4 == 0 {
+		// Only UnBox, no sensor data
+		processedData = fmt.Sprintf(`Timestamp: %s<br>
+DeviceID: %s<br>
+Type: MQTT<br>
+UnBox: %s`,
+			timestamp, deviceID, unBox)
+	} else {
+		// Full sensor data
+		processedData = fmt.Sprintf(`Timestamp: %s<br>
 DeviceID: %s<br>
 Type: MQTT<br>
 Current_ss1: %s<br>
@@ -96,9 +106,10 @@ Current_ss4: %s<br>
 SensorPowerStatus: ON<br>
 GSMSignal: 0<br>
 UnBox: %s`,
-		timestamp, deviceID,
-		formatNumber(sensor1), formatNumber(sensor2),
-		formatNumber(sensor3), formatNumber(sensor4), unBox)
+			timestamp, deviceID,
+			formatNumber(sensor1), formatNumber(sensor2),
+			formatNumber(sensor3), formatNumber(sensor4), unBox)
+	}
 
 	if alertResult != "N/A" {
 		processedData += fmt.Sprintf(`<br>Alert: %s`, alertResult)
